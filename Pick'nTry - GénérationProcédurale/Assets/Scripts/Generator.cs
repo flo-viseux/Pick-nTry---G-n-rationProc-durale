@@ -1,29 +1,23 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 public class Generator : MonoBehaviour
 {
-    #region SerializedFields
-    [SerializeField] private Transform cratere = null;
+    // mettre sur myges
 
-    [SerializeField] private float r = 4.0f;
+    [SerializeField] private Transform cratere;
+    [SerializeField] private float r;
+    [SerializeField] private float k;
+    [SerializeField] private int size;
 
-    [SerializeField] private int k = 10;
+    private List<Transform> grid;
 
-    [SerializeField] private int size = 4;
-    #endregion
 
-    #region Attributes
-    List<Transform> grid = new List<Transform>();
-    #endregion
 
-    #region UnityMethods
-    private void Start()
+    void Start()
     {
         grid = new List<Transform>();
-
         for (int i = 0; i < size * size; i++)
         {
             grid.Add(null);
@@ -31,27 +25,23 @@ public class Generator : MonoBehaviour
 
         StartCoroutine(Generate());
     }
-    #endregion
 
-    #region Private
     IEnumerator Generate()
     {
         List<int> activeIndices = new List<int>();
 
         int firstIndex = Random.Range(0, size * size);
-        activeIndices.Add(firstIndex); 
-        grid[firstIndex] = Instantiate(cratere, new Vector3(firstIndex % size - 1, 0, firstIndex / size - 1), Quaternion.identity);
+        activeIndices.Add(firstIndex);
+        grid[firstIndex] = Instantiate(cratere, new Vector3((firstIndex % size) * r, 0, (firstIndex / size) * r), Quaternion.identity);
 
-        int maxCount = 9999;
-        int count = 0;
-
+        int maxCount = 9999, count = 0;
         while (activeIndices.Count > 0 && count < maxCount)
         {
             int selectedIndex = Random.Range(0, activeIndices.Count);
             int activeIndex = activeIndices[selectedIndex];
-            int samples = 0;
-            Vector3 samplePos = new Vector3();
 
+            Vector3 samplePos = Vector3.zero;
+            int samples = 0;
             bool valid = false;
             while (!valid && samples < k)
             {
@@ -63,59 +53,76 @@ public class Generator : MonoBehaviour
 
                 samples++;
 
-                yield return new WaitForSeconds(.01f);
+                yield return null;
             }
 
             if (valid)
             {
-                int i = Mathf.FloorToInt(samplePos.z / r);
-                int j = Mathf.FloorToInt(samplePos.x / r);
-
-                int sampleIndex = i * size + j;
+                int sampleIndex = GetGridIndex(samplePos);
 
                 grid[sampleIndex] = Instantiate(cratere, samplePos, Quaternion.identity);
                 activeIndices.Add(sampleIndex);
             }
             else
+            {
                 activeIndices.RemoveAt(selectedIndex);
+            }
 
             count++;
         }
+
     }
 
     bool IsSampleValid(Vector3 samplePos)
     {
         int sampleIndex = GetGridIndex(samplePos);
-
-        if (IsValid(sampleIndex + 1, samplePos)
-            && IsValid(sampleIndex - 1, samplePos)
-            && IsValid(sampleIndex + size, samplePos)
-            && IsValid(sampleIndex + size + 1, samplePos)
-            && IsValid(sampleIndex + size - 1, samplePos)
-            && IsValid(sampleIndex - size, samplePos)
-            && IsValid(sampleIndex - size + 1, samplePos)
-            && IsValid(sampleIndex - size - 1, samplePos))
-            return true;
-
+        if (sampleIndex >= 0) // Inside grid
+        {
+            // Test if current and surrounding cells are free or contain an object that is far enough (> r)
+            if (IsValid(sampleIndex, samplePos)
+                && IsValid(sampleIndex + 1, samplePos)
+                && IsValid(sampleIndex - 1, samplePos)
+                && IsValid(sampleIndex + size, samplePos)
+                && IsValid(sampleIndex + size + 1, samplePos)
+                && IsValid(sampleIndex + size - 1, samplePos)
+                && IsValid(sampleIndex - size, samplePos)
+                && IsValid(sampleIndex - size - 1, samplePos)
+                && IsValid(sampleIndex - size + 1, samplePos))
+            {
+                return true;
+            }
+        }
         return false;
     }
 
     bool IsValid(int index, Vector3 samplePos)
     {
         if (index >= 0 && index < size * size)
-            return Vector3.Distance(grid[index].position, samplePos) > r;
-        else
-            return true;
+        {
+            if (grid[index])
+            {
+                return Vector3.Distance(grid[index].position, samplePos) > r;
+            }
+            else
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
-    int GetGridIndex(Vector3 samplePos)
+    int GetGridIndex(Vector3 pos)
     {
-        int i = Mathf.FloorToInt(samplePos.z / r);
-        int j = Mathf.FloorToInt(samplePos.x / r);
+        int i = Mathf.FloorToInt(pos.z / r);
+        int j = Mathf.FloorToInt(pos.x / r);
 
-        int sampleIndex = i * size + j;
-
-        return sampleIndex;
+        if (i >= 0 && i < size && j >= 0 && j < size) // Make sure it's inside the bounds of the grid
+        {
+            return i * size + j;
+        }
+        else
+        {
+            return -1;
+        }
     }
-    #endregion
 }
